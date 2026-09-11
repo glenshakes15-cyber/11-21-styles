@@ -1,0 +1,226 @@
+// This is your Prisma schema file,
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  phone         String?   @unique
+  username      String?   @unique
+  passwordHash  String?
+  name          String?
+  profilePicUrl String?
+  isVerified    Boolean   @default(false)
+  promoOptIn    Boolean   @default(false)
+  role          String    @default("USER")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  orders        Order[]
+  notificationPreference NotificationPreference?
+  feedbacks     Feedback[]
+  credentials   WebAuthnCredential[]
+  resetTokens   PasswordResetToken[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WebAuthnCredential {
+  id           String   @id @default(cuid())
+  userId       String
+  credentialId String   @unique
+  publicKey    String
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String
+  sizes       String
+  colors      String
+  priceKES    Decimal
+  priceTZS    Decimal?
+  priceUGX    Decimal?
+  priceUSD    Decimal?
+  priceEUR    Decimal?
+  priceGBP    Decimal?
+  stock       Int
+  images      String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems OrderItem[]
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  userId          String
+  status          String
+  paymentMethod   String
+  paymentCurrency String
+  totalAmount     Decimal
+  paymentRef      String?
+  paymentStatus   String
+  shippingAddress String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user   User        @relation(fields: [userId], references: [id])
+  items  OrderItem[]
+  events OrderEvent[]
+  payments Payment[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  size      String
+  color     String
+  unitPrice Decimal
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model OrderEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  actorId   String?
+  type      String
+  note      String?
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model Payment {
+  id                String   @id @default(cuid())
+  orderId           String
+  provider          String
+  providerReference String?
+  amount            Decimal
+  currency          String
+  status            String
+  rawResponse       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([providerReference])
+}
+
+model Feedback {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String
+  message    String
+  contact    String?
+  status     String
+  adminReply String?
+  repliedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model SiteConfig {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  value         String
+  lastUpdatedBy String?
+  lastUpdatedAt DateTime @updatedAt
+}
+
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  type      String
+  details   String
+  ip        String?
+  userId    String?
+  createdAt DateTime @default(now())
+}
+
+model WebAuthnChallenge {
+  id        String   @id @default(cuid())
+  userId    String
+  challenge String
+  type      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
+model NotificationPreference {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  email     Boolean @default(true)
+  sms       Boolean @default(false)
+  whatsapp  Boolean @default(false)
+  marketing Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
